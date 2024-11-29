@@ -1,9 +1,14 @@
 local composer = require( "composer" )
  
 local scene = composer.newScene()
-
+local audio = require("audio") -- Módulo de áudio do Corona
 local physics = require("physics")
 local MARGIN = 90
+local somAtivo -- Variável para armazenar o canal do som tocando, se necessário
+local somAudio = audio.loadSound("audios/audio5.mp3")
+
+
+
 local viruses = {}
 
 physics.start()
@@ -97,10 +102,40 @@ function scene:create( event )
            
         end)
 
-    local som = display.newImage(sceneGroup, "BOTOES/somligado.png")
-    som.x = display.contentWidth - som.width / 2 - MARGIN -470
-    som.y = display.contentHeight - som.height / 2 - MARGIN -770 
-
+    local somLigado = false 
+    local som = display.newImage(sceneGroup, "BOTOES/somdesligado.png")
+    som.x = display.contentWidth - som.width / 2 - MARGIN - 470
+    som.y = display.contentHeight - som.height / 2 - MARGIN - 775
+    
+    -- Função para alternar som ligado/desligado
+    local somLigado = false
+    local function toggleSom(event)
+        if somLigado then
+            somLigado = false
+            som.fill = {type = "image", filename = "BOTOES/somdesligado.png"}
+            som.x = display.contentWidth - som.width / 2 - MARGIN - 470
+            som.y = display.contentHeight - som.height / 2 - MARGIN - 756
+                -- Parar o som
+            if somAtivo then
+                audio.stop(somAtivo)
+                somAtivo = nil
+            end
+            print("Som desligado")
+        else
+            somLigado = true
+            som.fill = {type = "image", filename = "BOTOES/somligado.png"} 
+            som.x = display.contentWidth - som.width / 2 - MARGIN - 470
+            som.y = display.contentHeight - som.height / 2 - MARGIN - 770          
+                
+                
+            somAtivo = audio.play(somAudio, {loops = 0}) -- loops = 0 garante que o som toque apenas uma vez
+            print("Som ligado")
+        end
+        return true
+    end
+    
+    som:addEventListener("tap", toggleSom)
+        
     resetViruses(sceneGroup)
 
      -- Gerar partículas de vírus
@@ -131,17 +166,26 @@ function scene:hide( event )
  
     if ( phase == "will" ) then
     elseif ( phase == "did" ) then
+        if somAtivo then
+            audio.stop(somAtivo)
+            somAtivo = nil
+        end
         for i = #viruses, 1, -1 do
             display.remove(viruses[i])
             table.remove(viruses, i)
         end
+
     elseif (phase == "did") then
         -- Outras ações após a cena ser ocultada
     end
 end
- 
+
 function scene:destroy( event )
     local sceneGroup = self.view
+    if somAudio then
+        audio.dispose(somAudio)
+        somAudio = nil
+    end
 end
  
 scene:addEventListener( "create", scene )
