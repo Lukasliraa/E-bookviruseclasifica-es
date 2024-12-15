@@ -3,7 +3,6 @@ local composer = require("composer")
 local scene = composer.newScene()
 local audio = require("audio") -- Módulo de áudio do Corona
 
-
 local MARGIN = 90
 local somAtivo -- Variável para armazenar o canal do som tocando, se necessário
 
@@ -12,8 +11,7 @@ local somAudio = audio.loadSound("audios/audio2.mp3")
 -- Variáveis para armazenar os objetos interativos
 local capsideo
 local envelope
-local message
-local celulaPronta
+local estruturas = {}
 
 function scene:create(event)
     local sceneGroup = self.view
@@ -48,29 +46,20 @@ function scene:create(event)
     som.x = display.contentWidth - som.width / 2 - MARGIN - 470
     som.y = display.contentHeight - som.height / 2 - MARGIN - 775
 
--- Função para alternar som ligado/desligado
+    -- Função para alternar som ligado/desligado
     local somLigado = false
     local function toggleSom(event)
         if somLigado then
             somLigado = false
             som.fill = {type = "image", filename = "BOTOES/somdesligado.png"}
-            som.x = display.contentWidth - som.width / 2 - MARGIN - 470
-            som.y = display.contentHeight - som.height / 2 - MARGIN - 756
-            -- Parar o som
             if somAtivo then
                 audio.stop(somAtivo)
                 somAtivo = nil
             end
-            print("Som desligado")
         else
             somLigado = true
-            som.fill = {type = "image", filename = "BOTOES/somligado.png"} 
-            som.x = display.contentWidth - som.width / 2 - MARGIN - 470
-            som.y = display.contentHeight - som.height / 2 - MARGIN - 770          
-            
-            
-            somAtivo = audio.play(somAudio, {loops = 0}) -- loops = 0 garante que o som toque apenas uma vez
-            print("Som ligado")
+            som.fill = {type = "image", filename = "BOTOES/somligado.png"}
+            somAtivo = audio.play(somAudio, {loops = 0})
         end
         return true
     end
@@ -78,19 +67,23 @@ function scene:create(event)
     som:addEventListener("tap", toggleSom)
 end
 
--- Função para recriar os objetos interativos
+-- Função para criar animação de zoom
+local function criarAnimacaoZoom(target)
+    transition.to(target, {time = 2000, xScale = 2, yScale = 2, onComplete = function()
+        transition.to(target, {time = 2000, xScale = 1, yScale = 1})
+    end})
+end
+
+-- Função para criar objetos interativos
 local function criarObjetosInterativos(sceneGroup)
-    -- Criar Cápsideo
     capsideo = display.newImageRect(sceneGroup, "ELEMENTOS/capsideo.png", 250, 120)
     capsideo.x = display.contentCenterX + 230
     capsideo.y = display.contentCenterY - 410
 
-    -- Criar Envelope
     envelope = display.newImageRect(sceneGroup, "ELEMENTOS/envelope.png", 220, 120)
     envelope.x = display.contentCenterX + 230
     envelope.y = display.contentCenterY + 150
 
-    -- Função para verificar colisão
     local function verificarColisao(obj1, obj2)
         local dx = obj1.x - obj2.x
         local dy = obj1.y - obj2.y
@@ -99,7 +92,6 @@ local function criarObjetosInterativos(sceneGroup)
         return distancia < (obj1.width / 2 + obj2.width / 2)
     end
 
-    -- Função para arrastar os objetos
     local function arrastarObjeto(event)
         local target = event.target
 
@@ -115,24 +107,33 @@ local function criarObjetosInterativos(sceneGroup)
                 target.isFocus = false
             end
 
-            -- Verifica se houve colisão entre os objetos
             if verificarColisao(capsideo, envelope) then
-                -- Garante que a célula será criada apenas uma vez
                 if capsideo and envelope then
-                    -- Exibe a célula pronta
-                    celulaPronta = display.newImageRect(sceneGroup, "ELEMENTOS/celula.png", 500, 300)
-                    celulaPronta.x = display.contentCenterX + 270
-                    celulaPronta.y = display.contentCenterY - 85
-
-                    -- Remove os objetos arrastáveis após a fusão
                     capsideo:removeSelf()
                     capsideo = nil
                     envelope:removeSelf()
                     envelope = nil
 
-                    -- Atualiza a mensagem de instrução
-                    if message then
-                        message.text = "Cápsideo e Envelope unidos com sucesso!"
+                    -- Criação das 5 imagens interativas com posições definidas
+                    local posicoes = {
+                        {x = display.contentCenterX +260, y = display.contentCenterY -400},
+                        {x = display.contentCenterX +255, y = display.contentCenterY -280},
+                        {x = display.contentCenterX +260, y = display.contentCenterY -160},
+                        {x = display.contentCenterX + 255, y = display.contentCenterY -10},
+                        {x = display.contentCenterX + 250, y = display.contentCenterY +150},
+                    }
+
+                    for i = 1, 5 do
+                        local estrutura = display.newImageRect(sceneGroup, "ELEMENTOS/estru" .. i .. ".png", 120, 120)
+                        estrutura.x = posicoes[i].x
+                        estrutura.y = posicoes[i].y
+
+                        -- Adiciona evento de toque para zoom
+                        estrutura:addEventListener("tap", function()
+                            criarAnimacaoZoom(estrutura)
+                        end)
+
+                        estruturas[#estruturas + 1] = estrutura
                     end
                 end
             end
@@ -140,7 +141,6 @@ local function criarObjetosInterativos(sceneGroup)
         return true
     end
 
-    -- Adicionar listeners de toque para arrastar os objetos
     capsideo:addEventListener("touch", arrastarObjeto)
     envelope:addEventListener("touch", arrastarObjeto)
 end
@@ -150,7 +150,6 @@ function scene:show(event)
     local phase = event.phase
 
     if (phase == "did") then
-        -- Recriar objetos interativos ao voltar para esta tela
         criarObjetosInterativos(sceneGroup)
     end
 end
@@ -164,7 +163,7 @@ function scene:hide(event)
             audio.stop(somAtivo)
             somAtivo = nil
         end
-        -- Remover os objetos interativos antes de sair da tela
+
         if capsideo then
             capsideo:removeSelf()
             capsideo = nil
@@ -173,19 +172,14 @@ function scene:hide(event)
             envelope:removeSelf()
             envelope = nil
         end
-        if message then
-            message:removeSelf()
-            message = nil
+        for _, estrutura in ipairs(estruturas) do
+            estrutura:removeSelf()
         end
-        if celulaPronta then
-            celulaPronta:removeSelf()
-            celulaPronta = nil
-        end
+        estruturas = {}
     end
 end
 
 function scene:destroy(event)
-    local sceneGroup = self.view
     if somAudio then
         audio.dispose(somAudio)
         somAudio = nil
