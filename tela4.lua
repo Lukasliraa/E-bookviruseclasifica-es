@@ -1,7 +1,5 @@
 local composer = require("composer")
-local physics = require("physics") -- Para simular física
-local audio = require("audio") -- Módulo de áudio do Corona
-
+local audio = require("audio")
 local scene = composer.newScene()
 
 -- Configurações
@@ -9,124 +7,63 @@ local MARGIN = 90
 local somAtivo -- Variável para armazenar o canal do som tocando, se necessário
 local somAudio = audio.loadSound("audios/audio4.mp3")
 
-local particles = {}  -- Lista de partículas virais
-local cells = {}      -- Lista de células
-local screenWidth = display.contentWidth
-local screenHeight = display.contentHeight
+local virus1, virus2, virus3, virus4
+local smallViruses = {} -- Tabela para armazenar os vírus pequenos
 
-physics.start()
-physics.setGravity(0, 0)  -- Desativa a gravidade
+-- Função para mover os vírus para uma posição mais próxima da célula
+local function moveVirusesCloser()
+    -- Remover os vírus antigos
+    if virus1 then virus1:removeSelf() end
+    if virus2 then virus2:removeSelf() end
+    if virus3 then virus3:removeSelf() end
+    if virus4 then virus4:removeSelf() end
 
--- Função para criar células em posições e tamanhos específicos
-local function createCells(positions, size)
-    for _, pos in ipairs(positions) do
-        local cell = display.newImageRect("ELEMENTOS/celulasaudavel.png",40, 40,size.width, size.height)
-        cell.x = pos.x
-        cell.y = pos.y
-        cell.isInfected = false
-        physics.addBody(cell, "static", {radius = size.width / 2})
-        cells[#cells + 1] = cell
+    -- Adiciona novos vírus mais próximos
+    virus1 = display.newImageRect("ELEMENTOS/virusinfect.png", 150, 80)
+    virus1.x, virus1.y = 550, 400
+    scene.view:insert(virus1)
+
+    virus2 = display.newImageRect("ELEMENTOS/virusinfect.png", 150, 80)
+    virus2.x, virus2.y = 650, 520
+    scene.view:insert(virus2)
+
+    virus3 = display.newImageRect("ELEMENTOS/virusinfect.png", 150, 80)
+    virus3.x, virus3.y = 550, 520
+    scene.view:insert(virus3)
+
+    virus4 = display.newImageRect("ELEMENTOS/virusinfect.png", 150, 80)
+    virus4.x, virus4.y = 650, 400
+    scene.view:insert(virus4)
+
+    -- Chama a função para adicionar os vírus pequenos após mover os outros
+    createSmallViruses()
+end
+
+-- Função para criar vírus pequenos no centro da célula
+local function createSmallViruses()
+    -- Apaga os vírus pequenos se já existirem
+    for i = 1, #smallViruses do
+        smallViruses[i]:removeSelf()
+    end
+    smallViruses = {} -- Limpa a tabela
+
+    -- Adiciona 5 vírus pequenos no centro da célula
+    for i = 1, 5 do
+        local smallVirus = display.newImageRect("ELEMENTOS/virusbact.png", 50, 30)  -- Tamanho menor
+        smallVirus.x = 600 + math.random(-50, 50)  -- Posições aleatórias ao redor do centro
+        smallVirus.y = 420 + math.random(-50, 50)
+        scene.view:insert(smallVirus)
+        table.insert(smallViruses, smallVirus)
     end
 end
 
--- Função para criar partículas virais
-local function createParticle(x, y)
-    local particle = display.newImageRect("ELEMENTOS/virus.png", 35, 35)
-    particle.x = 35
-    particle.y = 750
-    physics.addBody(particle, "dynamic", {radius = 10, bounce = 0.8})
-    particle.isParticle = true
-    particles[#particles + 1] = particle
-end
-
--- Função de infecção
-local function infectCell(cell)
-    if cell and not cell.isInfected then
-        local x, y = cell.x, cell.y
-        if cell.removeSelf then
-            cell:removeSelf()
-        end
-        cell = nil
-
-        -- Criar uma célula infectada
-        local newCell = display.newImageRect("ELEMENTOS/celulainfectada.png", 40, 30)
-        newCell.x, newCell.y = x, y
-        newCell.isInfected = true
-        physics.addBody(newCell, "static", {radius = 20})
-        cells[#cells + 1] = newCell
-
-        -- Propagar a infecção
-        for _ = 1, 3 do
-            createParticle(newCell.x, newCell.y)
-        end
+-- Função que detecta a aceleração do dispositivo
+local function onAccelerate(event)
+    local shakeThreshold = 15  -- Aumentado para um movimento mais "forte"
+    if math.abs(event.x) > shakeThreshold or math.abs(event.y) > shakeThreshold or math.abs(event.z) > shakeThreshold then
+        -- Se o dispositivo foi "balançado", executa a ação desejada (ex: mover vírus)
+        moveVirusesCloser()
     end
-end
-
--- Função de colisão
-local function onCollision(event)
-    if event.phase == "began" then
-        local obj1 = event.object1
-        local obj2 = event.object2
-
-        if obj1 and obj2 then
-            if obj1.isParticle and not obj2.isParticle then
-                infectCell(obj2)
-            elseif obj2.isParticle and not obj1.isParticle then
-                infectCell(obj1)
-            end
-        end
-    end
-end
-
--- Função de simulação com o mouse (ou acelerômetro em dispositivos móveis)
-local function onTouch(event)
-    local touchX, touchY = event.x, event.y
-
-    for _, particle in ipairs(particles) do
-        if particle and particle.x and particle.y then
-            local dx = touchX - particle.x
-            local dy = touchY - particle.y
-            local distance = math.sqrt(dx * dx + dy * dy)
-
-            if distance > 1 then
-                local speed = 5
-                particle.x = particle.x + dx / distance * speed
-                particle.y = particle.y + dy / distance * speed
-            end
-        end
-    end
-end
-
--- Função para resetar a cena
-local function resetScene()
-    -- Limpa listas anteriores
-    for _, cell in ipairs(cells) do
-        if cell and cell.removeSelf then
-            cell:removeSelf()
-        end
-    end
-    cells = {}
-
-    for _, particle in ipairs(particles) do
-        if particle and particle.removeSelf then
-            particle:removeSelf()
-        end
-    end
-    particles = {}
-
-    -- Configurar novas células
-    local cellPositions = {
-        {x = 610, y = 400},
-        {x = 540, y = 400},
-        {x = 580, y = 600},
-        {x = 610, y = 260},
-        {x = 630, y = 500}
-    }
-    local cellSize = {width = 50, height = 50}
-    createCells(cellPositions, cellSize)
-
-    -- Criar uma nova partícula
-    createParticle(screenWidth / 2, screenHeight / 2)
 end
 
 function scene:create(event)
@@ -152,6 +89,7 @@ function scene:create(event)
         composer.gotoScene("tela3", {effect = "fade", time = 500})
     end)
 
+    -- Botão de som
     local som = display.newImage(sceneGroup, "BOTOES/somdesligado.png")
     som.x = display.contentWidth - som.width / 2 - MARGIN - 470
     som.y = display.contentHeight - som.height / 2 - MARGIN - 775
@@ -174,43 +112,56 @@ function scene:create(event)
     end
     som:addEventListener("tap", toggleSom)
 
-    Runtime:addEventListener("collision", onCollision)
-    Runtime:addEventListener("touch", onTouch)
+    -- Imagem da célula
+    local virus = display.newImageRect("ELEMENTOS/celulainfct.png", 600, 350)
+    virus.x, virus.y = 600, 420
+    sceneGroup:insert(virus)
+
+    -- Adicionando os 4 vírus ao redor da célula
+    virus1 = display.newImageRect("ELEMENTOS/virusbact.png", 150, 80)
+    virus1.x, virus1.y = 500, 320
+    sceneGroup:insert(virus1)
+
+    virus2 = display.newImageRect("ELEMENTOS/virusbact.png", 150, 80)
+    virus2.x, virus2.y = 700, 620
+    sceneGroup:insert(virus2)
+
+    virus3 = display.newImageRect("ELEMENTOS/virusbact.png", 150, 80)
+    virus3.x, virus3.y = 500, 620
+    sceneGroup:insert(virus3)
+
+    virus4 = display.newImageRect("ELEMENTOS/virusbact.png", 150, 80)
+    virus4.x, virus4.y = 700, 320
+    sceneGroup:insert(virus4)
 end
 
 function scene:show(event)
+    local sceneGroup = self.view
     local phase = event.phase
-    if phase == "did" then
-        resetScene() -- Reinicia a cena sempre que ela for exibida
+
+    if (phase == "did") then
+        -- Habilitar o acelerômetro somente se estiver disponível
+        if system.hasEventSource("accelerometer") then
+            Runtime:addEventListener("accelerate", onAccelerate)
+        else
+            print("Acelerômetro não disponível nesta plataforma.")
+        end
     end
 end
 
 function scene:hide(event)
+    local sceneGroup = self.view
     local phase = event.phase
-    if phase == "will" then
-        -- Remove células e partículas ao sair da cena
-        for _, cell in ipairs(cells) do
-            if cell and cell.removeSelf then
-                cell:removeSelf()
-            end
-        end
-        cells = {}
-        for _, particle in ipairs(particles) do
-            if particle and particle.removeSelf then
-                particle:removeSelf()
-            end
-        end
-        particles = {}
-        
-        -- Parar o áudio ao sair da cena
-        if somAtivo then
-            audio.stop(somAtivo)
-            somAtivo = nil
-        end
+
+    if (phase == "will") then
+        -- Remover o ouvinte do acelerômetro quando a cena for ocultada
+        Runtime:removeEventListener("accelerate", onAccelerate)
     end
 end
 
 function scene:destroy(event)
+    local sceneGroup = self.view
+    -- Código para limpar recursos, se necessário
     if somAtivo then
         audio.stop(somAtivo)
         somAtivo = nil
